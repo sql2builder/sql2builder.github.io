@@ -69,7 +69,9 @@
             return;
         }
 
-        input = input.slice(0, -1);
+        if (input.slice(-1) == ';') {
+            input = input.slice(0, -1);
+        }
 
         let parsed = null;
 

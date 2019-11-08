@@ -250,6 +250,8 @@ class Builder {
 
                 break;
             case '<':
+            case '!=':
+            case '<>':
                 func_name = 'where';
                 args.push(op.operation);
                 args.push(op.right.value);
