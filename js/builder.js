@@ -54,14 +54,12 @@ class Generator {
         for (let i = 0; i < args.length; i++) {
             let arg = args[i];
 
-            if (typeof arg === 'number') {
+            if (typeof arg === 'number' || arg === true || arg === false || (typeof arg == 'string' && arg.startsWith('function'))) {
                 res.push(arg);
             } else if (Array.isArray(arg)) {
                 res.push(`[${this.generateArgs(arg).join(',')}]`)
             } else if (arg instanceof Generator) {
                 res.push(arg.generate(1, false));
-            } else if (arg === true || arg === false || (typeof arg == 'string' && arg.startsWith('function'))) {
-                res.push(arg);
             } else {
                 res.push(`'${arg}'`);
             }
@@ -131,7 +129,6 @@ class Builder {
 
     select() {
         if (this.input.fields.length == 1 && this.input.fields[0].constructor.name == 'Star') {
-            console.log('star');
             return;
         }
 
@@ -190,22 +187,20 @@ class Builder {
         }
     }
 
-    orderBy()
-    {
+    orderBy() {
         if (this.input.order !== null) {
             for (const order of this.input.order.orderings) {
                 this.generator.addFunction('orderBy', [
-                   this.parseQualfiedIdFromLiteralValue(order.value),
-                   order.direction,
+                    this.parseQualfiedIdFromLiteralValue(order.value),
+                    order.direction,
                 ]);
             }
         }
     }
 
-    groupBy()
-    {
+    groupBy() {
         if (this.input.group != null) {
-            this.generator.addFunction('groupBy',...this.input.group.fields.map(f => this.parseQualfiedIdFromLiteralValue(f)));
+            this.generator.addFunction('groupBy', ...this.input.group.fields.map(f => this.parseQualfiedIdFromLiteralValue(f)));
 
             if (this.input.group.having != null) {
                 this.generator.addFunction('having', [
@@ -219,45 +214,59 @@ class Builder {
 
     parseWhere(op, pre_operation = null) {
         let func_name = '';
-        let args = [this.parseQualfiedIdFromLiteralValue(op.left)];
+        let args = [];
 
-        switch (op.operation) {
-            case '=':
-                func_name = 'where';
-                args.push(op.right.value);
-                break;
-            case 'IS':
-                if (op.right.value == null) {
-                    func_name = 'whereNull';
-                } else {
+        if (op.constructor.name == 'UnaryOp') {
+            if (op.operator == 'EXISTS') {
+                func_name = 'whereExists';
+            } else {
+                func_name = 'whereNotExists';
+            }
+
+            args.push(`function($query) {
+                    ${(new Builder(op.operand.select)).convert(7, false)}
+                }`)
+        } else {
+            args.push(this.parseQualfiedIdFromLiteralValue(op.left));
+
+            switch (op.operation) {
+                case '=':
                     func_name = 'where';
                     args.push(op.right.value);
-                }
+                    break;
+                case 'IS':
+                    if (op.right.value == null) {
+                        func_name = 'whereNull';
+                    } else {
+                        func_name = 'where';
+                        args.push(op.right.value);
+                    }
 
-                break;
-            case 'IS NOT':
-                if (op.right.value == null) {
-                    func_name = 'whereNotNull'
-                } else {
+                    break;
+                case 'IS NOT':
+                    if (op.right.value == null) {
+                        func_name = 'whereNotNull'
+                    } else {
+                        func_name = 'where';
+                        args.push(op.right.value);
+                    }
+
+                    break;
+                case 'IN':
+                    func_name = 'whereIn';
+                    args.push(op.right.value.map(v => v.value));
+
+                    break;
+                case '<':
+                case '!=':
+                case '<>':
                     func_name = 'where';
+                    args.push(op.operation);
                     args.push(op.right.value);
-                }
-
-                break;
-            case 'IN':
-                func_name = 'whereIn';
-                args.push(op.right.value.map(v => v.value));
-
-                break;
-            case '<':
-            case '!=':
-            case '<>':
-                func_name = 'where';
-                args.push(op.operation);
-                args.push(op.right.value);
-                break;
-            default:
-                throw new Error(`Operator ${op.operation} not supported.`)
+                    break;
+                default:
+                    throw new Error(`Operator ${op.operation} not supported.`)
+            }
         }
 
         return new Meta(this.formatFuncName(pre_operation, func_name), args);
@@ -283,13 +292,13 @@ class Builder {
         if (literal.nested == false) {
             qualfied_id = literal.value;
         } else {
-            qualfied_id = `${this.alias_table_map[literal.values[0]]}.${literal.values[1]}`;
+            qualfied_id = `${this.alias_table_map[literal.values[0]] ? this.alias_table_map[literal.values[0]] : literal.values[0]}.${literal.values[1]}`;
         }
 
         return qualfied_id;
     }
 
-    convert() {
+    convert(tab_count = 1, add_get = true) {
         this.source();
         this.joins();
         this.where(this.generator, this.input.where !== null ? this.input.where.conditions : null)
@@ -297,9 +306,11 @@ class Builder {
         this.orderBy();
         this.groupBy();
 
-        this.generator.addFunction('get');
+        if (add_get) {
+            this.generator.addFunction('get');
+        }
 
-        return this.generator.generate();
+        return this.generator.generate(tab_count);
     }
 }
 
