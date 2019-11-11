@@ -254,7 +254,14 @@ class Builder {
                     break;
                 case 'IN':
                     func_name = 'whereIn';
-                    args.push(op.right.value.map(v => v.value));
+
+                    if (op.right.constructor.name == 'SubSelect') {
+                        args.push(`function($query) {
+                            ${(new Builder(op.right.select)).convert(7, false)}
+                        }`);
+                    } else {
+                        args.push(op.right.value.map(v => v.value));
+                    }
 
                     break;
                 case '<':
