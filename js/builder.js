@@ -229,7 +229,9 @@ class Builder {
         } else {
             args.push(this.parseQualfiedIdFromLiteralValue(op.left));
 
-            switch (op.operation) {
+            let operation = op.operation.toUpperCase();
+
+            switch (operation) {
                 case '=':
                     func_name = 'where';
                     args.push(op.right.value);
@@ -253,7 +255,12 @@ class Builder {
 
                     break;
                 case 'IN':
-                    func_name = 'whereIn';
+                case 'NOT IN':
+                    if (operation == 'IN') {
+                        func_name = 'whereIn';
+                    } else {
+                        func_name = 'whereNotIn';
+                    }
 
                     if (op.right.constructor.name == 'SubSelect') {
                         args.push(`function($query) {
