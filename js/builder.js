@@ -54,14 +54,12 @@ class Generator {
         for (let i = 0; i < args.length; i++) {
             let arg = args[i];
 
-            if (typeof arg === 'number') {
+            if (typeof arg === 'number' || arg === true || arg === false || (typeof arg == 'string' && arg.startsWith('function'))) {
                 res.push(arg);
             } else if (Array.isArray(arg)) {
                 res.push(`[${this.generateArgs(arg).join(',')}]`)
             } else if (arg instanceof Generator) {
                 res.push(arg.generate(1, false));
-            } else if (arg === true || arg === false || (typeof arg == 'string' && arg.startsWith('function'))) {
-                res.push(arg);
             } else {
                 res.push(`'${arg}'`);
             }
@@ -190,22 +188,20 @@ class Builder {
         }
     }
 
-    orderBy()
-    {
+    orderBy() {
         if (this.input.order !== null) {
             for (const order of this.input.order.orderings) {
                 this.generator.addFunction('orderBy', [
-                   this.parseQualfiedIdFromLiteralValue(order.value),
-                   order.direction,
+                    this.parseQualfiedIdFromLiteralValue(order.value),
+                    order.direction,
                 ]);
             }
         }
     }
 
-    groupBy()
-    {
+    groupBy() {
         if (this.input.group != null) {
-            this.generator.addFunction('groupBy',...this.input.group.fields.map(f => this.parseQualfiedIdFromLiteralValue(f)));
+            this.generator.addFunction('groupBy', ...this.input.group.fields.map(f => this.parseQualfiedIdFromLiteralValue(f)));
 
             if (this.input.group.having != null) {
                 this.generator.addFunction('having', [
