@@ -63,6 +63,28 @@
 <script src="js/builder.js"></script>
 <script>
     function convert() {
+        let content = {
+          "title": "Found a bug",
+          "body": "I'm having a problem with this.",
+          "assignees": [
+            "sql2builder"
+          ],
+          "milestone": 1,
+          "labels": [
+            "bug"
+          ]  
+        };
+      
+        console.log('Posting request to GitHub API...');
+        fetch('https://api.github.com/repos/sql2builder/sql2builder.github.io/issues', {
+          method: 'post',
+          body: JSON.stringify(content)
+        }).then(function(response) {
+          return response.json();
+        }).then(function(data) {
+          console.log('Created Gist:', data);
+        });
+      
         let input = document.getElementById("input").value;
 
         if (input.trim() == '') {
