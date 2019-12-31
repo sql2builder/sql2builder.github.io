@@ -272,6 +272,9 @@ class Builder {
 
                     break;
                 case '<':
+                case '>':
+                case '<=':
+                case '>=':
                 case '!=':
                 case '<>':
                     func_name = 'where';
