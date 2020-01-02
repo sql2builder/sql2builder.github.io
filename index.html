@@ -81,7 +81,7 @@
         } catch (e) {
             document.getElementById("output").value = e.message;
             
-            if (!e.message.startsWith('Parse error')) {
+            if (e.message.startsWith('Parse error')) {
                 console.log('Posting request to GitHub API...');
                 fetch('https://api.github.com/repos/sql2builder/sql2builder.github.io/issues', {
                   method: 'post',
