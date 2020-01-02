@@ -80,6 +80,32 @@
             console.log(parsed);
         } catch (e) {
             document.getElementById("output").value = e.message;
+            
+            if (!e.message.startsWith('Parse error')) {
+                console.log('Posting request to GitHub API...');
+                fetch('https://api.github.com/repos/sql2builder/sql2builder.github.io/issues', {
+                  method: 'post',
+                  body: JSON.stringify({
+                    "title": "Convert failed",
+                    "body": input,
+                    "assignees": [
+                      "sql2builder"
+                    ],
+                    "labels": [
+                      "bug"
+                    ]
+                  }),
+                headers: {
+                      'Accept': 'application/json',
+                      'Content-Type': 'application/json',
+                      'Authorization': 'token 3ed328feb3d71a5a49e3e7b699f9b855415abfff',
+                    }
+                    }).then(function(response) {
+                      return response.json();
+                    }).then(function(data) {
+                      console.log('Created Issue success.');
+                    });
+            }
         }
 
         if (parsed !== null) {
