@@ -22,14 +22,14 @@ document.getElementById('convert-button').addEventListener('click', function () 
     try {
         let ast = wasm.parse_sql("--mysql", input);
 
-        output_text_area.value = (new Convert(JSON.parse(ast)[0].Query)).run();
+        output_text_area.value = (new Converter(JSON.parse(ast)[0].Query)).run();
     } catch (e) {
         output_text_area.value = e;
     }
 
 });
 
-class Convert
+class Converter
 {
     constructor(ast) {
         this.ast = ast;
@@ -280,7 +280,7 @@ class Convert
             let right = this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(binary_op.right));
 
             if (propertyExistsInObjectAndNotNull(join.relation, 'Derived')) { // joined section is sub-query
-                let sub_query_sql = new Convert(join.relation.Derived.subquery).run(false);
+                let sub_query_sql = new Converter(join.relation.Derived.subquery).run(false);
                 let sub_query_alias = join.relation.Derived.alias.name.value;
                 this.joins.push(join_method + '(DB::raw("' + addTabToEveryLine(sub_query_sql) + '") as '
                     + sub_query_alias + '), function($join) {\n\t'
