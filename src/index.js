@@ -34,7 +34,6 @@ class Converter
 {
     constructor(ast) {
         this.ast = ast;
-        this.wheres = [];
         this.joins = [];
         this.table_name_by_alias = {};
     }
@@ -54,8 +53,8 @@ class Converter
             res = res + '->' + join_section + '\n';
         }
 
-        if (this.hasWhereSection()) {
-            res = res + '->' + this.resolveWhereSection() + '\n';
+        if (propertyExistsInObjectAndNotNull(this.ast.body.Select, 'selection')) {
+            res = res + '->' + this.resolveWhereSection(this.ast.body.Select.selection) + '\n';
         }
 
         if (this.hasGroupBySection()) {
@@ -90,57 +89,54 @@ class Converter
         return 'DB::table(' + this.resolveTableNameFromRelationNode(this.ast.body.Select.from[0].relation) + ')';
     }
 
-    /**
-     * @return {boolean}
-     */
-    hasWhereSection() {
-        return propertyExistsInObjectAndNotNull(this.ast.body.Select, 'selection');
-    }
+    resolveWhereSection(selection_node) {
+        let condition_type = getNestedUniqueKeyFromObject(selection_node);
+        let condition = getNestedUniqueValueFromObject(selection_node);
 
-    resolveWhereSection() {
-        assert(this.ast.body.Select.selection !== null, 'selection section must exist');
-
-        let condition_type = getNestedUniqueKeyFromObject(this.ast.body.Select.selection);
-        let condition = getNestedUniqueValueFromObject(this.ast.body.Select.selection);
-
-        this.prepareWheres(condition_type, condition, '');
-
-        return this.wheres.join('\n->');
+        return this.prepareWheres(condition_type, condition, '').join('\n->');
     }
 
     /**
      * @param {string} condition_type
      * @param {Object} condition
      * @param {Object} op one of ['', 'And', 'Or']
-     * @return {void}
+     * @param {string[]} wheres
+     * @return {string[]}
      */
-    prepareWheres(condition_type, condition, op) {
+    prepareWheres(condition_type, condition, op, wheres = []) {
         if (condition_type === 'IsNull' || condition_type === 'IsNotNull') {
             let method_name = condition_type === 'IsNull' ? 'whereNull' : 'whereNotNull';
-            this.wheres.push(this.addPrefix2WhereMethods(op, method_name) + '(' + this.convertIdentifier2qualifiedColumn(condition.CompoundIdentifier) + ')');
+            wheres.push(this.addPrefix2WhereMethods(op, method_name) + '(' + this.convertIdentifier2qualifiedColumn(condition.CompoundIdentifier) + ')');
         } else if (condition_type === 'InList') {
             let column = this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(condition.expr));
             let list = condition.list.map((i) => this.resolveValue(getNestedUniqueValueFromObject(i)));
 
             let method_name = condition.negated ? 'whereNotIn' : 'whereIn';
-            this.wheres.push(this.addPrefix2WhereMethods(op, method_name) + '(' + column + ',' + '[' + list.join(', ') + '])');
+            wheres.push(this.addPrefix2WhereMethods(op, method_name) + '(' + column + ',' + '[' + list.join(', ') + '])');
+        } else if (condition_type === 'Nested') {
+            wheres.push(
+                this.addPrefix2WhereMethods(op, 'where') + '(function ($query) {\n'
+                    + '\t$query->' +  addTabToEveryLine(this.resolveWhereSection(condition), 2) + ';\n})'
+            );
         } else if (condition_type === 'BinaryOp') {
             if (condition.op === 'And' || condition.op === 'Or') {
                 let left_condition_type = getNestedUniqueKeyFromObject(condition.left);
                 let left_condition = getNestedUniqueValueFromObject(condition.left);
-                this.prepareWheres(left_condition_type, left_condition, op);
+                wheres = wheres.concat(this.prepareWheres(left_condition_type, left_condition, op));
 
                 let right_condition_type = getNestedUniqueKeyFromObject(condition.right);
                 let right_condition = getNestedUniqueValueFromObject(condition.right);
-                this.prepareWheres(right_condition_type, right_condition, condition.op);
+                wheres = wheres.concat(this.prepareWheres(right_condition_type, right_condition, condition.op))
             } else {
                 let left = this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(condition.left));
                 let right = this.resolveValue(getNestedUniqueValueFromObject(condition.right))
-                this.wheres.push(this.addPrefix2WhereMethods(op, 'where') + '(' + left + ',' + this.transformBinaryOp(condition.op) + ',' + right + ')');
+                wheres.push(this.addPrefix2WhereMethods(op, 'where') + '(' + left + ',' + this.transformBinaryOp(condition.op) + ',' + right + ')');
             }
         } else {
             throw 'Logic error, unhandled condition type [' + condition_type + ']';
         }
+
+        return wheres;
     }
 
     /**
@@ -182,7 +178,7 @@ class Converter
             } else if (propertyExistsInObjectAndNotNull(select_item, 'UnnamedExpr')) {
                 res.push(this.resolveSelectSectionItem(select_item.UnnamedExpr));
             } else if (select_item === 'Wildcard') {
-                res.push('*');
+                res.push(quote('*'));
             } else if (propertyExistsInObjectAndNotNull(select_item, 'QualifiedWildcard')) {
                 res.push(quote(this.getActualTableName(select_item.QualifiedWildcard[0].value) + '.*'))
             } else {
