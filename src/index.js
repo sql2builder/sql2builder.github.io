@@ -21,6 +21,7 @@ document.getElementById('convert-button').addEventListener('click', function () 
 
     try {
         let ast = wasm.parse_sql("--mysql", input);
+        console.log(ast);
 
         output_text_area.value = (new Converter(JSON.parse(ast)[0].Query)).run();
     } catch (e) {
@@ -182,6 +183,8 @@ class Converter
                 res.push(this.resolveSelectSectionItem(select_item.UnnamedExpr));
             } else if (select_item === 'Wildcard') {
                 res.push('*');
+            } else if (propertyExistsInObjectAndNotNull(select_item, 'QualifiedWildcard')) {
+                res.push(quote(this.getActualTableName(select_item.QualifiedWildcard[0].value) + '.*'))
             } else {
                 throw 'Logic error, unhandled select item [' + Object.keys(select_item)[0] + ']';
             }
@@ -348,6 +351,14 @@ class Converter
         }
     }
 
+    getActualTableName(table_name_or_alias) {
+        if (propertyExistsInObjectAndNotNull(this.table_name_by_alias, table_name_or_alias)) {
+            return this.table_name_by_alias[table_name_or_alias];
+        }
+
+        return table_name_or_alias;
+    }
+
     /**
      * @param identifier
      * @param {boolean} need_quote
@@ -358,9 +369,7 @@ class Converter
         let table_name_or_alias = values[0];
 
         // First index always is table name or alias, change it to actual table name.
-        if (propertyExistsInObjectAndNotNull(this.table_name_by_alias, table_name_or_alias)) {
-            values[0] = this.table_name_by_alias[table_name_or_alias];
-        }
+        values[0] = this.getActualTableName(table_name_or_alias);
 
         let res = values.join('.');
 
