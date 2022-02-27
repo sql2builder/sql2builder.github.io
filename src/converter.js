@@ -107,7 +107,7 @@ export class Converter
         } else if (condition_type === 'Exists') {
             wheres.push(
                 this.addPrefix2WhereMethods(op, 'whereExists') + '(function ($query) {\n' +
-                '\t' +  addTabToEveryLine((new Converter(condition)).run(), 2).replace('DB::table', '$query->from') + ';\n' +
+                '\t' +  addTabToEveryLine((new Converter(condition)).run(false), 2).replace('DB::table', '$query->from') + ';\n' +
                 '}'
             );
         } else {
