@@ -19,6 +19,8 @@
   },
   "homepage": "https://github.com/sql2builder/sql2builder.github.io#readme",
   "dependencies": {
+    "@sentry/browser": "^6.18.1",
+    "@sentry/tracing": "^6.18.1",
     "sqlparser-rs-wasm": "^0.2.4"
   },
   "devDependencies": {

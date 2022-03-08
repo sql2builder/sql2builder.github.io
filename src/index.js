@@ -1,5 +1,17 @@
 import * as wasm from "sqlparser-rs-wasm";
 import {Converter} from "./converter";
+import * as Sentry from "@sentry/browser";
+import { BrowserTracing } from "@sentry/tracing";
+
+Sentry.init({
+    dsn: "https://1130fb45d5b944bc83e0bf90a7d46182@o1161856.ingest.sentry.io/6248410",
+    integrations: [new BrowserTracing()],
+
+    // Set tracesSampleRate to 1.0 to capture 100%
+    // of transactions for performance monitoring.
+    // We recommend adjusting this value in production
+    tracesSampleRate: 1.0,
+});
 
 document.getElementById('convert-button').addEventListener('click', function () {
     let input = document.getElementById("input").value;
@@ -31,6 +43,8 @@ document.getElementById('convert-button').addEventListener('click', function () 
         }
     } catch (e) {
         output_text_area.value = e;
+        Sentry.captureMessage(input);
+        Sentry.captureException(e);
         throw e;
     }
 });
