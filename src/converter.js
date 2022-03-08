@@ -65,48 +65,58 @@ export class Converter
         let condition_type = getNestedUniqueKeyFromObject(selection_node);
         let condition = getNestedUniqueValueFromObject(selection_node);
 
-        return this.prepareWheres(condition_type, condition, '').join('\n->');
+        return this.prepareConditions(condition_type, condition, '', 'where').join('\n->');
     }
 
     /**
      * @param {string} condition_type
      * @param {Object} condition
      * @param {Object} op one of ['', 'And', 'Or']
-     * @param {string[]} wheres
+     * @param {string} method_name
      * @return {string[]}
      */
-    prepareWheres(condition_type, condition, op, wheres = []) {
+    prepareConditions(condition_type, condition, op, method_name) {
+        let conditions = [];
+
         if (condition_type === 'IsNull' || condition_type === 'IsNotNull') {
             let method_name = condition_type === 'IsNull' ? 'whereNull' : 'whereNotNull';
-            wheres.push(this.addPrefix2WhereMethods(op, method_name) + '(' + this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(condition)) + ')');
+            conditions.push(this.addPrefix2Methods(op, method_name) + '(' + this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(condition)) + ')');
         } else if (condition_type === 'InList') {
             let column = this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(condition.expr));
             let list = condition.list.map((i) => this.resolveValue(getNestedUniqueValueFromObject(i), getNestedUniqueKeyFromObject(i)));
 
             let method_name = condition.negated ? 'whereNotIn' : 'whereIn';
-            wheres.push(this.addPrefix2WhereMethods(op, method_name) + '(' + column + ',' + '[' + list.join(', ') + '])');
+            conditions.push(this.addPrefix2Methods(op, method_name) + '(' + column + ',' + '[' + list.join(', ') + '])');
         } else if (condition_type === 'Nested') {
-            wheres.push(
-                this.addPrefix2WhereMethods(op, 'where') + '(function ($query) {\n'
+            conditions.push(
+                this.addPrefix2Methods(op, 'where') + '(function ($query) {\n'
                 + '\t$query->' +  addTabToEveryLine(this.resolveWhereSection(condition), 2) + ';\n})'
             );
         } else if (condition_type === 'BinaryOp') {
             if (condition.op === 'And' || condition.op === 'Or') {
                 let left_condition_type = getNestedUniqueKeyFromObject(condition.left);
                 let left_condition = getNestedUniqueValueFromObject(condition.left);
-                wheres = wheres.concat(this.prepareWheres(left_condition_type, left_condition, op));
+                conditions = conditions.concat(this.prepareConditions(left_condition_type, left_condition, op, method_name));
 
                 let right_condition_type = getNestedUniqueKeyFromObject(condition.right);
                 let right_condition = getNestedUniqueValueFromObject(condition.right);
-                wheres = wheres.concat(this.prepareWheres(right_condition_type, right_condition, condition.op))
+                conditions = conditions.concat(this.prepareConditions(right_condition_type, right_condition, condition.op, method_name))
             } else {
                 let left = this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(condition.left));
-                let right = this.resolveValue(getNestedUniqueValueFromObject(condition.right), getNestedUniqueKeyFromObject(condition.right))
-                wheres.push(this.addPrefix2WhereMethods(op, 'where') + '(' + left + ',' + this.transformBinaryOp(condition.op) + ',' + right + ')');
+                let right;
+
+                if (propertyExistsInObjectAndNotNull(condition.right, 'Identifier', 'CompoundIdentifier')) {
+                    right = this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(condition.right));
+                } else {
+                    method_name = 'where';
+                    right = this.resolveValue(getNestedUniqueValueFromObject(condition.right), getNestedUniqueKeyFromObject(condition.right))
+                }
+
+                conditions.push(this.addPrefix2Methods(op, method_name) + '(' + left + ',' + quote(this.transformBinaryOp(condition.op)) + ',' + right + ')');
             }
         } else if (condition_type === 'Exists') {
-            wheres.push(
-                this.addPrefix2WhereMethods(op, 'whereExists') + '(function ($query) {\n' +
+            conditions.push(
+                this.addPrefix2Methods(op, 'whereExists') + '(function ($query) {\n' +
                 '\t' +  addTabToEveryLine((new Converter(condition)).run(false), 2).replace('DB::table', '$query->from') + ';\n' +
                 '}'
             );
@@ -114,7 +124,7 @@ export class Converter
             throw 'Logic error, unhandled condition type [' + condition_type + ']';
         }
 
-        return wheres;
+        return conditions;
     }
 
     /**
@@ -139,8 +149,8 @@ export class Converter
         return operator_by_op[op];
     }
 
-    addPrefix2WhereMethods(op, method_name) {
-        if (op === '') {
+    addPrefix2Methods(op, method_name) {
+        if (op === '' || op === 'And') {
             return method_name;
         }
 
@@ -247,7 +257,7 @@ export class Converter
 
         if (propertyExistsInObjectAndNotNull(binary_op.left, 'Function')) {
             left = quote(this.parseFunctionNode(binary_op.left.Function));
-        } else if (propertyExistsInObjectAndNotNull(binary_op.left, 'Identifier') || propertyExistsInObjectAndNotNull(binary_op.left, 'CompoundIdentifier')){
+        } else if (propertyExistsInObjectAndNotNull(binary_op.left, 'Identifier', 'CompoundIdentifier')){
             left = this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(binary_op.left));
         } else {
             throw 'Logic error, unhandled type in binary op left';
@@ -268,21 +278,36 @@ export class Converter
                 'RightOuter': 'rightJoin',
             }[join_operator_type];
             let join_operator = getNestedUniqueValueFromObject(join.join_operator);
-            let left;
-            let on_condition;
-            let right;
-            [left, on_condition, right] = this.parseBinaryOpNode(join_operator.On.BinaryOp);
+            let condition_type = getNestedUniqueKeyFromObject(join_operator.On);
+            let condition = getNestedUniqueValueFromObject(join_operator.On);
+            let conditions = this.prepareConditions(condition_type, condition, '', 'on');
 
             if (propertyExistsInObjectAndNotNull(join.relation, 'Derived')) { // joined section is sub-query
                 let sub_query_sql = new Converter(join.relation.Derived.subquery).run(false);
                 let sub_query_alias = join.relation.Derived.alias.name.value;
                 this.joins.push(join_method + '(DB::raw("' + addTabToEveryLine(sub_query_sql) + '") as '
                     + sub_query_alias + '), function($join) {\n\t'
-                    + '$join->on(' + left + ',' + on_condition + ',' + right + ');'
+                    + '$join->' + addTabToEveryLine(conditions.join('\n->') + ';', 2)
                     + '\n}');
-            } else {
+            } else if (propertyExistsInObjectAndNotNull(join.relation, 'Table')) {
                 let joined_table = this.resolveTableNameFromRelationNode(join.relation);
-                this.joins.push(join_method + '(' + joined_table + ',' + left + ',' + on_condition + ',' + right + ')');
+
+                if (conditions.length === 1) {
+                    let left;
+                    let on_condition;
+                    let right;
+                    [left, on_condition, right] = this.parseBinaryOpNode(join_operator.On.BinaryOp);
+
+                    this.joins.push(join_method + '(' + joined_table + ',' + left + ',' + on_condition + ',' + right + ')');
+                } else {
+                    this.joins.push(join_method + '(' + joined_table + ','
+                        + 'function($join) {\n\t'
+                        + '$join->' + addTabToEveryLine(conditions.join('\n->')) + ';'
+                        + '\n}'
+                    );
+                }
+            } else {
+                throw 'Logic error, unhandled join relation type';
             }
         }
     }
@@ -319,7 +344,7 @@ export class Converter
         for (const order_by_item of this.ast.order_by) {
             if (propertyExistsInObjectAndNotNull(order_by_item.expr, 'BinaryOp')) {
                 order_bys.push('orderByRaw(' + quote(this.parseBinaryOpNode(order_by_item.expr.BinaryOp).map((i) => unquote(i)).join(' ')) + ')');
-            } else if (propertyExistsInObjectAndNotNull(order_by_item.expr, 'Identifier') || propertyExistsInObjectAndNotNull(order_by_item.expr, 'CompoundIdentifier')) {
+            } else if (propertyExistsInObjectAndNotNull(order_by_item.expr, 'Identifier', 'CompoundIdentifier')) {
                 order_bys.push(
                     'orderBy(' +
                     this.convertIdentifier2qualifiedColumn(getNestedUniqueKeyFromObject(order_by_item.expr)) + ',' +
@@ -392,11 +417,11 @@ function assert(condition, msg) {
 
 /**
  * @param obj
- * @param property_name
+ * @param property_names
  * @return {boolean}
  */
-function propertyExistsInObjectAndNotNull(obj, property_name) {
-    return obj.hasOwnProperty(property_name) && obj[property_name] !== null;
+function propertyExistsInObjectAndNotNull(obj, ...property_names) {
+    return property_names.reduce((carry, property_name) => carry || (obj.hasOwnProperty(property_name) && obj[property_name] !== null), false);
 }
 
 /**

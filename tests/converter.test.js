@@ -10,7 +10,7 @@ function getQueryBuilder(ast) {
 test('complex sql', () => {
     expect(getQueryBuilder(complex_ast)).toBe(`DB::table('posts')
 ->select('posts.*', 'a.name')
-->leftJoin('comments','c.post_id','=','posts.id')
+->leftJoin('comments','comments.post_id','=','posts.id')
 ->rightJoin('users','user.id','=','posts.user_id')
 ->leftJoin(DB::raw("DB::table('address')
 \t->select('*')
@@ -18,10 +18,10 @@ test('complex sql', () => {
 \t$join->on('user.aid','=','a.id');
 }
 ->where(function ($query) {
-\t$query->where('a.name',=,'bejing')
-\t\t->andWhere('a.id',<,10);
+\t$query->where('a.name','=','bejing')
+\t\t->where('a.id','<',10);
 })
-->andWhere('comments.conent',=,'abc')
+->where('comments.conent','=','abc')
 ->orderBy('','asc')
 ->orderBy('','desc')
 ->get();`);
