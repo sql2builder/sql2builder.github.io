@@ -38,13 +38,12 @@ document.getElementById('convert-button').addEventListener('click', function () 
         if (ast.startsWith('Error')) {
             output_text_area.value = ast;
         } else {
-            console.log(ast);
             output_text_area.value = (new Converter(JSON.parse(ast)[0].Query)).run();
         }
     } catch (e) {
         output_text_area.value = e;
         Sentry.captureMessage(input);
-        Sentry.captureException(e);
+        
         throw e;
     }
 });
