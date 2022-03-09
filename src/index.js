@@ -11,6 +11,7 @@ Sentry.init({
     // of transactions for performance monitoring.
     // We recommend adjusting this value in production
     tracesSampleRate: 1.0,
+    allowUrls: ['https://sql2builder.github.io/']
 });
 
 document.getElementById('convert-button').addEventListener('click', function () {
