@@ -42,8 +42,8 @@ document.getElementById('convert-button').addEventListener('click', function () 
             output_text_area.value = (new Converter(JSON.parse(ast)[0].Query)).run();
         }
     } catch (e) {
+        console.log(input);
         output_text_area.value = e;
-        Sentry.captureMessage(input);
         
         throw e;
     }
