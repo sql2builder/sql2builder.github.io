@@ -43,7 +43,7 @@ document.getElementById('convert-button').addEventListener('click', function () 
         }
     } catch (e) {
         console.log(input);
-        output_text_area.value = e;
+        output_text_area.value = e + ', I will fix this issue as soon as possible';
         
         throw e;
     }

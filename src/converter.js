@@ -111,6 +111,10 @@ export class Converter
                 } else if (propertyExistsInObjectAndNotNull(condition.right, 'Value')) {
                     method_name = 'where';
                     right = this.resolveValue(condition.right.Value)
+                } else if (propertyExistsInObjectAndNotNull(condition.right, 'Subquery')) {
+                    right = 'function($query) {\n'
+                        + '\t' + addTabToEveryLine((new Converter(condition.right.Subquery).run(false)).replace('DB::table', '$query->from'), 2) + ';\n'
+                        + '}'
                 } else {
                     throw 'Logic error, unhandled condition.right type';
                 }
