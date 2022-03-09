@@ -84,7 +84,7 @@ export class Converter
             conditions.push(this.addPrefix2Methods(op, method_name) + '(' + this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(condition)) + ')');
         } else if (condition_type === 'InList') {
             let column = this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(condition.expr));
-            let list = condition.list.map((i) => this.resolveValue(i));
+            let list = condition.list.map((i) => this.resolveValue(i.Value));
 
             let method_name = condition.negated ? 'whereNotIn' : 'whereIn';
             conditions.push(this.addPrefix2Methods(op, method_name) + '(' + column + ',' + '[' + list.join(', ') + '])');
