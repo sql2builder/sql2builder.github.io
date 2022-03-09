@@ -83,7 +83,7 @@ export class Converter
             conditions.push(this.addPrefix2Methods(op, method_name) + '(' + this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(condition)) + ')');
         } else if (condition_type === 'InList') {
             let column = this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(condition.expr));
-            let list = condition.list.map((i) => this.resolveValue(getNestedUniqueValueFromObject(i), getNestedUniqueKeyFromObject(i)));
+            let list = condition.list.map((i) => this.resolveValue(i));
 
             let method_name = condition.negated ? 'whereNotIn' : 'whereIn';
             conditions.push(this.addPrefix2Methods(op, method_name) + '(' + column + ',' + '[' + list.join(', ') + '])');
@@ -107,9 +107,11 @@ export class Converter
 
                 if (propertyExistsInObjectAndNotNull(condition.right, 'Identifier', 'CompoundIdentifier')) {
                     right = this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(condition.right));
-                } else {
+                } else if (propertyExistsInObjectAndNotNull(condition.right, 'Value')) {
                     method_name = 'where';
-                    right = this.resolveValue(getNestedUniqueValueFromObject(condition.right), getNestedUniqueKeyFromObject(condition.right))
+                    right = this.resolveValue(condition.right.Value)
+                } else {
+                    throw 'Logic error, unhandled condition.right type';
                 }
 
                 conditions.push(this.addPrefix2Methods(op, method_name) + '(' + left + ',' + quote(this.transformBinaryOp(condition.op)) + ',' + right + ')');
@@ -119,6 +121,14 @@ export class Converter
                 this.addPrefix2Methods(op, 'whereExists') + '(function ($query) {\n' +
                 '\t' +  addTabToEveryLine((new Converter(condition)).run(false), 2).replace('DB::table', '$query->from') + ';\n' +
                 '}'
+            );
+        } else if (condition_type === 'Between') {
+            let method_name = condition.negated === true ? 'whereBetween' : 'whereNotBetween';
+
+            conditions.push(
+              this.addPrefix2Methods(op, method_name) + '('
+              + this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(condition.expr)) + ','
+              + '[' + this.resolveValue(condition.low.Value) + ',' + this.resolveValue(condition.high.Value) + '])'
             );
         } else {
             throw 'Logic error, unhandled condition type [' + condition_type + ']';
@@ -221,7 +231,7 @@ export class Converter
             if (arg.Unnamed === 'Wildcard') {
                 res = res + '*';
             } else if (propertyExistsInObjectAndNotNull(arg.Unnamed.Expr, 'Value')) {
-                res = res + this.resolveValue(arg.Unnamed.Expr.Value, 'Value');
+                res = res + this.resolveValue(arg.Unnamed.Expr.Value);
             } else if (propertyExistsInObjectAndNotNull(arg.Unnamed.Expr, 'Identifier')) {
                 res = res + arg.Unnamed.Expr.Identifier.value;
             } else if (propertyExistsInObjectAndNotNull(arg.Unnamed.Expr, 'CompoundIdentifier')) {
@@ -359,15 +369,17 @@ export class Converter
     }
 
     /**
-     * @param value
-     * @param value_type
+     * @param valueNode
      * @return {string|*}
      */
-    resolveValue(value, value_type) {
-        if (propertyExistsInObjectAndNotNull(value, 'SingleQuotedString')) {
-            return quote(value.SingleQuotedString);
-        } else if (propertyExistsInObjectAndNotNull(value, 'Number')) {
-            return value.Number[0];
+    resolveValue(valueNode) {
+        let value = getNestedUniqueValueFromObject(valueNode);
+        let value_type = getNestedUniqueKeyFromObject(valueNode);
+
+        if (value_type === 'SingleQuotedString') {
+            return quote(value);
+        } else if (value_type === 'Number') {
+            return value[0];
         } else if (value_type === 'CompoundIdentifier' || value_type === 'Identifier') {
             return this.convertIdentifier2qualifiedColumn(value);
         } else {
