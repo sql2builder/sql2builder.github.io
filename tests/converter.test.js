@@ -13,8 +13,7 @@ test('complex sql', () => {
 ->leftJoin('comments','comments.post_id','=','posts.id')
 ->rightJoin('users','user.id','=','posts.user_id')
 ->leftJoin(DB::raw("DB::table('address')
-\t->select('*')
-\t") as a), function($join) {
+\t->select('*')") as a), function($join) {
 \t$join->on('user.aid','=','a.id');
 }
 ->where(function ($query) {

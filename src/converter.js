@@ -7,41 +7,42 @@ export class Converter
     }
 
     run(need_append_get_suffix = true) {
-        let res = this.resolveMainTableSection() + '\n';
+        let sections = []
+        sections.push(this.resolveMainTableSection());
         let join_section = '';
 
         // Resolve 'join' section before 'where' section, because need find joined table alias
         if (this.hasJoinSection()) {
-            join_section =this.resolveJoinSection();
+            join_section = this.resolveJoinSection();
         }
 
-        res = res + '->' + this.resolveSelectSection() + '\n';
+        sections.push(this.resolveSelectSection())
 
         if (join_section !== '') {
-            res = res + '->' + join_section + '\n';
+            sections.push(join_section);
         }
 
         if (propertyExistsInObjectAndNotNull(this.ast.body.Select, 'selection')) {
-            res = res + '->' + this.resolveWhereSection(this.ast.body.Select.selection) + '\n';
+            sections.push(this.resolveWhereSection(this.ast.body.Select.selection));
         }
 
         if (propertyExistsInObjectAndNotNull(this.ast.body.Select, 'group_by') && this.ast.body.Select.group_by.length > 0) {
-            res = res + '->' + this.resolveGroupBySection() + '\n';
+            sections.push(this.resolveGroupBySection());
 
             if (propertyExistsInObjectAndNotNull(this.ast.body.Select, 'having')) {
-                res = res + '->' + this.resolveHavingSection() + '\n';
+                sections.push(this.resolveHavingSection());
             }
         }
 
         if (propertyExistsInObjectAndNotNull(this.ast, 'order_by') && this.ast.order_by.length > 0) {
-            res = res + '->' + this.resolveOrderBySection() + '\n';
+            sections.push(this.resolveOrderBySection());
         }
 
         if (need_append_get_suffix) {
-            res = res + '->get();';
+            sections.push('get();');
         }
 
-        return res;
+        return sections.join('\n->');
     }
 
     resolveTableNameFromRelationNode(relation_node) {
@@ -129,6 +130,15 @@ export class Converter
               this.addPrefix2Methods(op, method_name) + '('
               + this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(condition.expr)) + ','
               + '[' + this.resolveValue(condition.low.Value) + ',' + this.resolveValue(condition.high.Value) + '])'
+            );
+        } else if (condition_type === 'InSubquery') {
+            let method_name = condition.negated === true ? 'whereIn' : 'whereNotIn';
+
+            conditions.push(
+              this.addPrefix2Methods(op, method_name)
+              + '(' + this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(condition.expr)) + ',' + '(function ($query) {\n'
+              + '\t' + addTabToEveryLine((new Converter(condition.subquery)).run(false), 2).replace('DB::table', '$query->from') + ';\n'
+              + '}'
             );
         } else {
             throw 'Logic error, unhandled condition type [' + condition_type + ']';
