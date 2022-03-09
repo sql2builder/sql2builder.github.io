@@ -8,7 +8,17 @@ export class Converter
 
     run(need_append_get_suffix = true) {
         let sections = []
-        sections.push(this.resolveMainTableSection());
+
+        let relation_node = this.ast.body.Select.from[0].relation;
+
+        if (propertyExistsInObjectAndNotNull(relation_node, 'Table')) {
+            sections.push(this.resolveMainTableSection());
+        } else if (propertyExistsInObjectAndNotNull(relation_node, 'Derived')) {
+            sections.push(this.resolveFromSubSection());
+        } else {
+            throw 'Logic error, unhandled relation type';
+        }
+
         let join_section = '';
 
         // Resolve 'join' section before 'where' section, because need find joined table alias
@@ -46,13 +56,13 @@ export class Converter
     }
 
     resolveTableNameFromRelationNode(relation_node) {
-        let table_name = relation_node.Table.name[0].value;
+            let table_name = relation_node.Table.name[0].value;
 
-        if (propertyExistsInObjectAndNotNull(relation_node.Table, 'alias')) {
-            this.table_name_by_alias[relation_node.Table.alias.name.value] = table_name;
-        }
+            if (propertyExistsInObjectAndNotNull(relation_node.Table, 'alias')) {
+                this.table_name_by_alias[relation_node.Table.alias.name.value] = table_name;
+            }
 
-        return quote(table_name);
+            return quote(table_name);
     }
 
     /**
@@ -60,6 +70,15 @@ export class Converter
      */
     resolveMainTableSection() {
         return 'DB::table(' + this.resolveTableNameFromRelationNode(this.ast.body.Select.from[0].relation) + ')';
+    }
+
+    /**
+     * @return {string}
+     */
+    resolveFromSubSection() {
+        return 'DB::query()->fromSub(function ($query) {\n'
+            + '\t' + addTabToEveryLine((new Converter(this.ast.body.Select.from[0].relation.Derived.subquery).run(false)).replace('DB::table', '$query->from'), 2) + ';\n'
+            + '},' + quote(this.ast.body.Select.from[0].relation.Derived.alias.name.value) + ')';
     }
 
     resolveWhereSection(selection_node) {
@@ -90,7 +109,7 @@ export class Converter
             conditions.push(this.addPrefix2Methods(op, method_name) + '(' + column + ',' + '[' + list.join(', ') + '])');
         } else if (condition_type === 'Nested') {
             conditions.push(
-                this.addPrefix2Methods(op, 'where') + '(function ($query) {\n'
+                this.addPrefix2Methods(op, method_name) + '(function ($query) {\n'
                 + '\t$query->' +  addTabToEveryLine(this.resolveWhereSection(condition), 2) + ';\n})'
             );
         } else if (condition_type === 'BinaryOp') {
@@ -317,12 +336,20 @@ export class Converter
                 let joined_table = this.resolveTableNameFromRelationNode(join.relation);
 
                 if (conditions.length === 1) {
-                    let left;
-                    let on_condition;
-                    let right;
-                    [left, on_condition, right] = this.parseBinaryOpNode(join_operator.On.BinaryOp);
+                    if (propertyExistsInObjectAndNotNull(join_operator.On, 'BinaryOp')) {
+                        let left;
+                        let on_condition;
+                        let right;
+                        [left, on_condition, right] = this.parseBinaryOpNode(join_operator.On.BinaryOp);
 
-                    this.joins.push(join_method + '(' + joined_table + ',' + left + ',' + on_condition + ',' + right + ')');
+                        this.joins.push(join_method + '(' + joined_table + ',' + left + ',' + on_condition + ',' + right + ')');
+                    } else if (propertyExistsInObjectAndNotNull(join_operator.On, 'Nested')){
+                        let conditions = this.prepareConditions('Nested', join_operator.On.Nested, '', 'on');
+
+                        this.joins.push(conditions[0]);
+                    } else {
+                        throw 'Logic error, unhandled on type';
+                    }
                 } else {
                     this.joins.push(join_method + '(' + joined_table + ','
                         + 'function($join) {\n\t'
