@@ -254,7 +254,7 @@ export class Converter
 
     parseFunctionNode(function_node) {
         let function_name = function_node.name[0].value;
-        let res = function_name + '(';
+        let res = quote(function_name) + '(';
         let args = function_node.args;
         let arg_count = args.length;
 
@@ -370,13 +370,19 @@ export class Converter
     }
 
     resolveGroupBySection() {
-        let group_by = this.ast.body.Select.group_by;
+        let group_by_columns = [];
 
-        if (group_by.length === 1) {
-            return 'groupBy(' + this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(group_by[0])) + ')';
-        } else {
-            return 'groupByRaw(' + quote(group_by.map((i) => this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(i), false)).join(', ')) + ')';
+        for (const group_by_item of this.ast.body.Select.group_by) {
+            if (propertyExistsInObjectAndNotNull(group_by_item, 'Function')) {
+                group_by_columns.push('DB::raw(' + this.parseFunctionNode(group_by_item.Function) + '")');
+            } else if(propertyExistsInObjectAndNotNull(group_by_item, 'Identifier', 'CompoundIdentifier')) {
+                group_by_columns.push(this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(group_by_item)));
+            } else {
+                throw 'Logic error, unhandled group by type:' + getNestedUniqueKeyFromObject(group_by_item);
+            }
         }
+
+        return 'groupBy(' + group_by_columns.join(',') + ')';
     }
 
     resolveHavingSection() {
@@ -398,9 +404,11 @@ export class Converter
             } else if (propertyExistsInObjectAndNotNull(order_by_item.expr, 'Identifier', 'CompoundIdentifier')) {
                 order_bys.push(
                     'orderBy(' +
-                    this.convertIdentifier2qualifiedColumn(getNestedUniqueKeyFromObject(order_by_item.expr)) + ',' +
+                    this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(order_by_item.expr)) + ',' +
                     quote(order_by_item.asc === false ? 'desc': 'asc') + ')'
                 );
+            } else if (propertyExistsInObjectAndNotNull(order_by_item.expr, 'Function')) {
+                order_bys.push('orderByRaw("' + this.parseFunctionNode(order_by_item.expr.Function) + ' ' + (order_by_item.asc === false ? 'desc': 'asc') + '")');
             } else {
                 throw 'Logic error, unhandled order by type:' + getNestedUniqueKeyFromObject(order_by_item.expr);
             }

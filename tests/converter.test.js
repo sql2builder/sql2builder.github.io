@@ -21,7 +21,7 @@ test('complex sql', () => {
 \t\t->where('a.id','<',10);
 })
 ->where('comments.conent','=','abc')
-->orderBy('','asc')
-->orderBy('','desc')
+->orderBy('comments.created_at','asc')
+->orderBy('posts.created_at','desc')
 ->get();`);
 });
