@@ -252,9 +252,14 @@ export class Converter
         }
     }
 
-    parseFunctionNode(function_node) {
+    parseFunctionNode(function_node, need_quote = true) {
         let function_name = function_node.name[0].value;
-        let res = quote(function_name) + '(';
+
+        if (need_quote) {
+            function_name = quote(function_name);
+        }
+
+        let res = function_name + '(';
         let args = function_node.args;
         let arg_count = args.length;
 
@@ -269,8 +274,18 @@ export class Converter
                 res = res + arg.Unnamed.Expr.Identifier.value;
             } else if (propertyExistsInObjectAndNotNull(arg.Unnamed.Expr, 'CompoundIdentifier')) {
                 res = res + this.convertIdentifier2qualifiedColumn(arg.Unnamed.Expr.CompoundIdentifier);
+            } else if (propertyExistsInObjectAndNotNull(arg.Unnamed.Expr, 'Nested')) { // e.g. COUNT(DISTINCT('id'))
+                let arg_column = this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(arg.Unnamed.Expr.Nested));
+
+                if (function_node.distinct === true) {
+                    arg_column = 'DISTINCT(' + arg_column + ')';
+                }
+
+                res = res + arg_column;
+            } else if (propertyExistsInObjectAndNotNull(arg.Unnamed.Expr, 'Function')) {
+                res = res + this.parseFunctionNode(arg.Unnamed.Expr.Function, false);
             } else {
-                throw 'Logic error, unhandled arg type';
+                throw 'Logic error, unhandled arg type:' + getNestedUniqueKeyFromObject(arg.Unnamed.Expr);
             }
 
 
