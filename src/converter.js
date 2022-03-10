@@ -134,8 +134,10 @@ export class Converter
                     right = 'function($query) {\n'
                         + '\t' + addTabToEveryLine((new Converter(condition.right.Subquery).run(false)).replace('DB::table', '$query->from'), 2) + ';\n'
                         + '}'
+                } else if (propertyExistsInObjectAndNotNull(condition.right, 'Function')) {
+                    right = 'DB::raw(' + this.parseFunctionNode(condition.right.Function) + ')';
                 } else {
-                    throw 'Logic error, unhandled condition.right type';
+                    throw 'Logic error, unhandled condition.right type:' + getNestedUniqueKeyFromObject(condition.right);
                 }
 
                 conditions.push(this.addPrefix2Methods(op, method_name) + '(' + left + ',' + quote(this.transformBinaryOp(condition.op)) + ',' + right + ')');
