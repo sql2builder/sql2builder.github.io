@@ -165,6 +165,8 @@ export class Converter
               + '\t' + addTabToEveryLine((new Converter(condition.subquery)).run(false), 2).replace('DB::table', '$query->from') + ';\n'
               + '}'
             );
+        } else if (condition_type === 'Function') {
+            conditions.push(this.addPrefix2Methods(op, method_name) + '(DB::raw("' + this.parseFunctionNode(condition, false) + '"))');
         } else {
             throw 'Logic error, unhandled condition type [' + condition_type + ']';
         }
