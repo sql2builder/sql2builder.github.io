@@ -2,19 +2,18 @@ export class Converter
 {
     constructor(ast) {
         this.ast = ast;
-        this.joins = [];
         this.table_name_by_alias = {};
     }
 
     run(need_append_get_suffix = true) {
         let sections = []
 
-        let relation_node = this.ast.body.Select.from[0].relation;
+        let from_item = this.ast.body.Select.from[0];
 
-        if (propertyExistsInObjectAndNotNull(relation_node, 'Table')) {
-            sections.push(this.resolveMainTableSection());
-        } else if (propertyExistsInObjectAndNotNull(relation_node, 'Derived')) {
-            sections.push(this.resolveFromSubSection());
+        if (propertyExistsInObjectAndNotNull(from_item.relation, 'Table')) {
+            sections.push(this.resolveMainTableSection(from_item));
+        } else if (propertyExistsInObjectAndNotNull(from_item.relation, 'Derived')) {
+            sections.push(this.resolveFromSubSection('DB::query()->fromSub'), from_item);
         } else {
             throw 'Logic error, unhandled relation type';
         }
@@ -22,8 +21,13 @@ export class Converter
         let join_section = '';
 
         // Resolve 'join' section before 'where' section, because need find joined table alias
-        if (this.hasJoinSection()) {
-            join_section = this.resolveJoinSection();
+        if (this.hasJoinSection(from_item)) {
+            join_section = this.resolveJoinSection(from_item);
+        }
+
+        // Has cross join
+        if (this.ast.body.Select.from.slice(1).length > 0) {
+            sections = sections.concat(this.resolveCrossJoinSection(this.ast.body.Select.from.slice(1)));
         }
 
         sections.push(this.resolveSelectSection())
@@ -68,17 +72,17 @@ export class Converter
     /**
      * @return {string}
      */
-    resolveMainTableSection() {
-        return 'DB::table(' + this.resolveTableNameFromRelationNode(this.ast.body.Select.from[0].relation) + ')';
+    resolveMainTableSection(from_item) {
+        return 'DB::table(' + this.resolveTableNameFromRelationNode(from_item.relation) + ')';
     }
 
     /**
      * @return {string}
      */
-    resolveFromSubSection() {
-        return 'DB::query()->fromSub(function ($query) {\n'
-            + '\t' + addTabToEveryLine((new Converter(this.ast.body.Select.from[0].relation.Derived.subquery).run(false)).replace('DB::table', '$query->from'), 2) + ';\n'
-            + '},' + quote(this.ast.body.Select.from[0].relation.Derived.alias.name.value) + ')';
+    resolveFromSubSection(prefix, from_item) {
+        return prefix + '(function ($query) {\n'
+            + '\t' + addTabToEveryLine((new Converter(from_item.relation.Derived.subquery).run(false)).replace('DB::table', '$query->from'), 2) + ';\n'
+            + '},' + quote(from_item.relation.Derived.alias.name.value) + ')';
     }
 
     resolveWhereSection(selection_node) {
@@ -306,12 +310,8 @@ export class Converter
     /**
      * @return {boolean}
      */
-    hasJoinSection() {
-        if (this.ast.body.Select.from.length > 1) {
-            throw 'Cross join is not supported';
-        }
-
-        return propertyExistsInObjectAndNotNull(this.ast.body.Select.from[0], 'joins') && this.ast.body.Select.from[0].joins.length > 0;
+    hasJoinSection(from_item) {
+        return propertyExistsInObjectAndNotNull(from_item, 'joins') && from_item.joins.length > 0;
     }
 
     parseBinaryOpNode(binary_op) {
@@ -331,8 +331,10 @@ export class Converter
         return [left, op, right];
     }
 
-    prepareJoins() {
-        for (const join of this.ast.body.Select.from[0].joins) {
+    prepareJoins(from_item) {
+        let joins = [];
+
+        for (const join of from_item.joins) {
             let join_operator_type = getNestedUniqueKeyFromObject(join.join_operator);
             let join_method = {
                 'Inner': 'join',
@@ -347,7 +349,7 @@ export class Converter
             if (propertyExistsInObjectAndNotNull(join.relation, 'Derived')) { // joined section is sub-query
                 let sub_query_sql = new Converter(join.relation.Derived.subquery).run(false);
                 let sub_query_alias = join.relation.Derived.alias.name.value;
-                this.joins.push(join_method + '(DB::raw("' + addTabToEveryLine(sub_query_sql) + '") as '
+                joins.push(join_method + '(DB::raw("' + addTabToEveryLine(sub_query_sql) + '") as '
                     + sub_query_alias + '), function($join) {\n\t'
                     + '$join->' + addTabToEveryLine(conditions.join('\n->') + ';', 2)
                     + '\n}');
@@ -361,16 +363,16 @@ export class Converter
                         let right;
                         [left, on_condition, right] = this.parseBinaryOpNode(join_operator.On.BinaryOp);
 
-                        this.joins.push(join_method + '(' + joined_table + ',' + left + ',' + on_condition + ',' + right + ')');
+                        joins.push(join_method + '(' + joined_table + ',' + left + ',' + on_condition + ',' + right + ')');
                     } else if (propertyExistsInObjectAndNotNull(join_operator.On, 'Nested')){
                         let conditions = this.prepareConditions('Nested', join_operator.On.Nested, '', 'on');
 
-                        this.joins.push(conditions[0]);
+                        joins.push(conditions[0]);
                     } else {
                         throw 'Logic error, unhandled on type';
                     }
                 } else {
-                    this.joins.push(join_method + '(' + joined_table + ','
+                    joins.push(join_method + '(' + joined_table + ','
                         + 'function($join) {\n\t'
                         + '$join->' + addTabToEveryLine(conditions.join('\n->')) + ';'
                         + '\n}'
@@ -380,12 +382,36 @@ export class Converter
                 throw 'Logic error, unhandled join relation type';
             }
         }
+
+        return joins;
     }
 
-    resolveJoinSection() {
-        this.prepareJoins();
+    resolveJoinSection(from_item) {
+        return this.prepareJoins(from_item).join('\n->');
+    }
 
-        return this.joins.join('\n->');
+    /**
+     * @param from_items
+     * @return {string[]}
+     */
+    resolveCrossJoinSection(from_items) {
+        let cross_join_sections = [];
+
+        for (const from_item of from_items) {
+            let cross_join_str;
+
+            if (propertyExistsInObjectAndNotNull(from_item.relation, 'Table')) {
+                cross_join_str = 'crossJoin(' + this.resolveTableNameFromRelationNode(from_item.relation);
+            } else if (propertyExistsInObjectAndNotNull(from_item.relation, 'Derived')) {
+                cross_join_str = this.resolveFromSubSection('crossJoinSub', from_item);
+            } else {
+                throw 'Logic error, unhandled cross join relation type';
+            }
+
+            cross_join_sections.push(cross_join_str);
+        }
+
+        return cross_join_sections;
     }
 
     resolveGroupBySection() {
