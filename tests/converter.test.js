@@ -1,6 +1,7 @@
 import {Converter} from "../src/converter";
 import {test, expect} from "@jest/globals";
-import {complex_ast} from './ast'
+import {complex_ast} from './ast';
+import {cross_join_ast} from './crossjoin';
 
 
 function getQueryBuilder(ast) {
@@ -23,5 +24,18 @@ test('complex sql', () => {
 ->where('comments.conent','=','abc')
 ->orderBy('comments.created_at','asc')
 ->orderBy('posts.created_at','desc')
+->get();`);
+});
+
+test('cross join', () => {
+   expect(getQueryBuilder(cross_join_ast)).toBe(`DB::table('posts')
+->crossJoinSub(function ($query) {
+\t$query->from('posts')
+\t\t->select('count', DB::raw("'max'(created_date) as created_date"))
+\t\t->groupBy('count');
+},'max_counts')
+->select('posts.*')
+->where('posts.count','=','max_counts.count')
+->where('posts.created_date','=','max_counts.created_date')
 ->get();`);
 });
