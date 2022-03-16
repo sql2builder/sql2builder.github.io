@@ -294,6 +294,10 @@ export class Converter
                 res = res + arg_column;
             } else if (propertyExistsInObjectAndNotNull(arg.Unnamed.Expr, 'Function')) {
                 res = res + this.parseFunctionNode(arg.Unnamed.Expr.Function, false);
+            } else if (propertyExistsInObjectAndNotNull(arg.Unnamed.Expr, 'BinaryOp')) {
+                res = res + this.parseBinaryOpNode(arg.Unnamed.Expr.BinaryOp);
+            } else if (propertyExistsInObjectAndNotNull(arg.Unnamed.Expr, 'UnaryOp')) {
+                // todo
             } else {
                 throw 'Logic error, unhandled arg type:' + getNestedUniqueKeyFromObject(arg.Unnamed.Expr);
             }
@@ -316,21 +320,30 @@ export class Converter
         return propertyExistsInObjectAndNotNull(from_item, 'joins') && from_item.joins.length > 0;
     }
 
-    parseBinaryOpNode(binary_op) {
-        let left;
+    parseBinaryOpPartial(left_or_right) {
+        let res;
 
-        if (propertyExistsInObjectAndNotNull(binary_op.left, 'Function')) {
-            left = quote(this.parseFunctionNode(binary_op.left.Function));
-        } else if (propertyExistsInObjectAndNotNull(binary_op.left, 'Identifier', 'CompoundIdentifier')){
-            left = this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(binary_op.left));
+        if (propertyExistsInObjectAndNotNull(left_or_right, 'Function')) {
+            res = quote(this.parseFunctionNode(left_or_right.Function));
+        } else if (propertyExistsInObjectAndNotNull(left_or_right, 'Identifier', 'CompoundIdentifier')){
+            res = this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(left_or_right));
+        } else if (propertyExistsInObjectAndNotNull(left_or_right, 'Value')) {
+            res = this.resolveValue(left_or_right.Value);
+        } else if (propertyExistsInObjectAndNotNull(left_or_right, 'BinaryOp')) {
+            res = this.parseBinaryOpNode(left_or_right.BinaryOp);
         } else {
-            throw 'Logic error, unhandled type in binary op left';
+            throw 'Logic error, unhandled type in binary op left or right.';
         }
 
-        let op = quote(this.transformBinaryOp(binary_op.op));
-        let right = this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(binary_op.right));
+        return res;
+    }
 
-        return [left, op, right];
+    parseBinaryOpNode(binary_op, separator = ' ') {
+        let left = this.parseBinaryOpPartial(binary_op.left);
+        let op = quote(this.transformBinaryOp(binary_op.op));
+        let right = this.parseBinaryOpPartial(binary_op.right);
+
+        return [left, op, right].join(separator);
     }
 
     prepareJoins(from_item) {
@@ -360,12 +373,7 @@ export class Converter
 
                 if (conditions.length === 1) {
                     if (propertyExistsInObjectAndNotNull(join_operator.On, 'BinaryOp')) {
-                        let left;
-                        let on_condition;
-                        let right;
-                        [left, on_condition, right] = this.parseBinaryOpNode(join_operator.On.BinaryOp);
-
-                        joins.push(join_method + '(' + joined_table + ',' + left + ',' + on_condition + ',' + right + ')');
+                        joins.push(join_method + '(' + joined_table + ',' + this.parseBinaryOpNode(join_operator.On.BinaryOp, ',') + ')');
                     } else if (propertyExistsInObjectAndNotNull(join_operator.On, 'Nested')){
                         let conditions = this.prepareConditions('Nested', join_operator.On.Nested, '', 'on');
 
@@ -437,7 +445,7 @@ export class Converter
         let binary_op = getNestedUniqueValueFromObject(this.ast.body.Select.having, 'BinaryOp');
         let method_name = propertyExistsInObjectAndNotNull(binary_op.left, 'Function') ? 'havingRaw' : 'having';
 
-        return method_name + '(' + this.parseBinaryOpNode(binary_op).join(',') + ')';
+        return method_name + '(' + this.parseBinaryOpNode(binary_op, ',') + ')';
     }
 
     /**
@@ -448,7 +456,7 @@ export class Converter
 
         for (const order_by_item of this.ast.order_by) {
             if (propertyExistsInObjectAndNotNull(order_by_item.expr, 'BinaryOp')) {
-                order_bys.push('orderByRaw(' + quote(this.parseBinaryOpNode(order_by_item.expr.BinaryOp).map((i) => unquote(i)).join(' ')) + ')');
+                order_bys.push('orderByRaw(' + quote(this.parseBinaryOpNode(order_by_item.expr.BinaryOp)) + ')');
             } else if (propertyExistsInObjectAndNotNull(order_by_item.expr, 'Identifier', 'CompoundIdentifier')) {
                 order_bys.push(
                     'orderBy(' +

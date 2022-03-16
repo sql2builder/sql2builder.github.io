@@ -1,4 +1,11 @@
-// select p.*, a.name from posts as p left join comments as c on c.post_id = p.id right join users on user.id = p.user_id left join (select * from address) as a on user.aid = a.id where (a.name = 'bejing' and a.id < 10) and c.conent = 'abc' order by c.created_at, p.created_at desc;
+// select p.*, a.name
+// from posts as p
+// left join comments as c on c.post_id = p.id
+// right join users on user.id = p.user_id
+// left join (select * from address) as a on user.aid = a.id
+// where (a.name = 'bejing' and a.id < 10)
+// and c.conent = 'abc'
+// order by c.created_at, p.created_at desc;
 let complex_ast = [
     {
         "Query": {
