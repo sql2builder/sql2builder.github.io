@@ -487,6 +487,8 @@ export class Converter
             return value[0];
         } else if (value_type === 'CompoundIdentifier' || value_type === 'Identifier') {
             return this.convertIdentifier2qualifiedColumn(value);
+        } else if (value_type === 'Boolean') {
+          return value;
         } else {
             throw 'Logic error, unhandled arg value type:' + value_type;
         }
