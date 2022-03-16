@@ -424,6 +424,7 @@ export class Converter
                 group_by_columns.push('DB::raw(' + this.parseFunctionNode(group_by_item.Function) + '")');
             } else if(propertyExistsInObjectAndNotNull(group_by_item, 'Identifier', 'CompoundIdentifier')) {
                 group_by_columns.push(this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(group_by_item)));
+            } else if (propertyExistsInObjectAndNotNull(group_by_item, 'Nested')) {
             } else {
                 throw 'Logic error, unhandled group by type:' + getNestedUniqueKeyFromObject(group_by_item);
             }
