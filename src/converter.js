@@ -171,6 +171,8 @@ export class Converter
             );
         } else if (condition_type === 'Function') {
             conditions.push(this.addPrefix2Methods(op, method_name) + '(DB::raw("' + this.parseFunctionNode(condition, false) + '"))');
+        } else if (condition_type === 'UnaryOp') {
+            conditions.push(this.prepareConditions(getNestedUniqueKeyFromObject(condition.expr), getNestedUniqueValueFromObject(condition.expr), op, method_name)[0].replace(/where/i, 'where' + condition.op));
         } else {
             throw 'Logic error, unhandled condition type [' + condition_type + ']';
         }
