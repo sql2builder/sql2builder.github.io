@@ -14,7 +14,7 @@ Sentry.init({
     allowUrls: ['https://sql2builder.github.io/']
 });
 
-document.getElementById('convert-button').addEventListener('click', function () {
+let converter = function () {
     let input = document.getElementById("input").value;
 
     if (input.trim() === '') {
@@ -44,7 +44,24 @@ document.getElementById('convert-button').addEventListener('click', function () 
     } catch (e) {
         console.log(input);
         output_text_area.value = e + ', I will fix this issue as soon as possible';
-        
+
         throw e;
     }
+}
+
+let url_search_params = new URLSearchParams(window.location.search);
+
+if(url_search_params.has('base64sql')) {
+    document.getElementById('input').value = atob(url_search_params.get('base64sql'));
+    converter();
+}
+
+document.getElementById('convert-button').addEventListener('click', converter);
+document.getElementById('share-button').addEventListener('click', function () {
+    let share_link = window.location.origin + '?base64sql=' + btoa(document.getElementById('input').value);
+    navigator.clipboard.writeText(share_link).then(function() {
+        alert('Share link copied.');
+    }, function() {
+        alert('Copy failed.');
+    });
 });
