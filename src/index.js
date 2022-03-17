@@ -49,12 +49,14 @@ let converter = function () {
     }
 }
 
-let url_search_params = new URLSearchParams(window.location.search);
+window.addEventListener('load', (event) => {
+    let url_search_params = new URLSearchParams(window.location.search);
 
-if(url_search_params.has('base64sql')) {
-    document.getElementById('input').value = atob(url_search_params.get('base64sql'));
-    converter();
-}
+    if(url_search_params.has('base64sql')) {
+        document.getElementById('input').value = atob(url_search_params.get('base64sql'));
+        converter();
+    }
+});
 
 document.getElementById('convert-button').addEventListener('click', converter);
 document.getElementById('share-button').addEventListener('click', function () {
