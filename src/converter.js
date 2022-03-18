@@ -331,6 +331,8 @@ export class Converter
             res = this.resolveValue(left_or_right.Value);
         } else if (propertyExistsInObjectAndNotNull(left_or_right, 'BinaryOp')) {
             res = this.parseBinaryOpNode(left_or_right.BinaryOp);
+        } else if (propertyExistsInObjectAndNotNull(left_or_right, 'Subquery')) {
+            // todo
         } else {
             throw 'Logic error, unhandled type in binary op left or right.';
         }
