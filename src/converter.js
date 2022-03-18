@@ -131,6 +131,10 @@ export class Converter
 
                 if (propertyExistsInObjectAndNotNull(condition.right, 'Identifier', 'CompoundIdentifier')) {
                     right = this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(condition.right));
+
+                    if (method_name.includes('where')) {
+                        right = 'DB::raw(' + right + ')';
+                    }
                 } else if (propertyExistsInObjectAndNotNull(condition.right, 'Value')) {
                     method_name = 'where';
                     right = this.resolveValue(condition.right.Value)

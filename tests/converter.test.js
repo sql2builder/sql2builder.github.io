@@ -35,7 +35,7 @@ test('cross join', () => {
 \t\t->groupBy('count');
 },'max_counts')
 ->select('posts.*')
-->where('posts.count','=','max_counts.count')
-->where('posts.created_date','=','max_counts.created_date')
+->where('posts.count','=',DB::raw('max_counts.count'))
+->where('posts.created_date','=',DB::raw('max_counts.created_date'))
 ->get();`);
 });
