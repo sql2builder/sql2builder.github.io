@@ -484,6 +484,10 @@ export class Converter
      * @return {string|*}
      */
     resolveValue(valueNode) {
+        if (isString(valueNode) && valueNode.toLowerCase() === 'null') {
+            return 'null';
+        }
+
         let value = getNestedUniqueValueFromObject(valueNode);
         let value_type = getNestedUniqueKeyFromObject(valueNode);
 
