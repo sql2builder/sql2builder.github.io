@@ -302,6 +302,8 @@ export class Converter
                 res = res + this.parseBinaryOpNode(arg.Unnamed.Expr.BinaryOp);
             } else if (propertyExistsInObjectAndNotNull(arg.Unnamed.Expr, 'UnaryOp')) {
                 // todo
+            } else if (propertyExistsInObjectAndNotNull(arg.Unnamed.Expr, 'Case')) {
+                // todo
             } else {
                 throw 'Logic error, unhandled arg type:' + getNestedUniqueKeyFromObject(arg.Unnamed.Expr);
             }
