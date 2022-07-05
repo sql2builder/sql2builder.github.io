@@ -305,7 +305,7 @@ export class Converter
             } else if (propertyExistsInObjectAndNotNull(arg.Unnamed.Expr, 'Case')) {
                 // todo
             } else {
-                throw 'Logic error, unhandled arg type:' + getNestedUniqueKeyFromObject(arg.Unnamed.Expr);
+                // throw 'Logic error, unhandled arg type:' + getNestedUniqueKeyFromObject(arg.Unnamed.Expr);
             }
 
 
