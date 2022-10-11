@@ -157,7 +157,7 @@ export class Converter
                 '}'
             );
         } else if (condition_type === 'Between') {
-            let method_name = condition.negated === true ? 'whereBetween' : 'whereNotBetween';
+            let method_name = condition.negated === true ? 'whereNotBetween' : 'whereBetween';
 
             conditions.push(
               this.addPrefix2Methods(op, method_name) + '('
@@ -165,7 +165,7 @@ export class Converter
               + '[' + this.resolveValue(condition.low.Value) + ',' + this.resolveValue(condition.high.Value) + '])'
             );
         } else if (condition_type === 'InSubquery') {
-            let method_name = condition.negated === true ? 'whereIn' : 'whereNotIn';
+            let method_name = condition.negated === true ? 'whereNotIn' : 'whereIn';
 
             conditions.push(
               this.addPrefix2Methods(op, method_name)
