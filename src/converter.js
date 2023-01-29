@@ -1,8 +1,9 @@
 export class Converter
 {
-    constructor(ast) {
+    constructor(ast, parent = null) {
         this.ast = ast;
         this.table_name_by_alias = {};
+        this.parent = parent;
     }
 
     run(need_append_get_suffix = true) {
@@ -81,7 +82,7 @@ export class Converter
      */
     resolveFromSubSection(prefix, from_item) {
         return prefix + '(function ($query) {\n'
-            + '\t' + addTabToEveryLine((new Converter(from_item.relation.Derived.subquery).run(false)).replace('DB::table', '$query->from'), 2) + ';\n'
+            + '\t' + addTabToEveryLine((new Converter(from_item.relation.Derived.subquery, this).run(false)).replace('DB::table', '$query->from'), 2) + ';\n'
             + '},' + quote(from_item.relation.Derived.alias.name.value) + ')';
     }
 
@@ -140,7 +141,7 @@ export class Converter
                     right = this.resolveValue(condition.right.Value)
                 } else if (propertyExistsInObjectAndNotNull(condition.right, 'Subquery')) {
                     right = 'function($query) {\n'
-                        + '\t' + addTabToEveryLine((new Converter(condition.right.Subquery).run(false)).replace('DB::table', '$query->from'), 2) + ';\n'
+                        + '\t' + addTabToEveryLine((new Converter(condition.right.Subquery, this).run(false)).replace('DB::table', '$query->from'), 2) + ';\n'
                         + '}'
                 } else if (propertyExistsInObjectAndNotNull(condition.right, 'Function')) {
                     right = 'DB::raw(' + this.parseFunctionNode(condition.right.Function) + ')';
@@ -153,7 +154,7 @@ export class Converter
         } else if (condition_type === 'Exists') {
             conditions.push(
                 this.addPrefix2Methods(op, 'whereExists') + '(function ($query) {\n' +
-                '\t' +  addTabToEveryLine((new Converter(condition)).run(false), 2).replace('DB::table', '$query->from') + ';\n' +
+                '\t' +  addTabToEveryLine((new Converter(condition, this)).run(false), 2).replace('DB::table', '$query->from') + ';\n' +
                 '}'
             );
         } else if (condition_type === 'Between') {
@@ -170,7 +171,7 @@ export class Converter
             conditions.push(
               this.addPrefix2Methods(op, method_name)
               + '(' + this.convertIdentifier2qualifiedColumn(getNestedUniqueValueFromObject(condition.expr)) + ',' + '(function ($query) {\n'
-              + '\t' + addTabToEveryLine((new Converter(condition.subquery)).run(false), 2).replace('DB::table', '$query->from') + ';\n'
+              + '\t' + addTabToEveryLine((new Converter(condition.subquery, this)).run(false), 2).replace('DB::table', '$query->from') + ';\n'
               + '}'
             );
         } else if (condition_type === 'Function') {
@@ -370,7 +371,7 @@ export class Converter
             let conditions = this.prepareConditions(condition_type, condition, '', 'on');
 
             if (propertyExistsInObjectAndNotNull(join.relation, 'Derived')) { // joined section is sub-query
-                let sub_query_sql = new Converter(join.relation.Derived.subquery).run(false);
+                let sub_query_sql = new Converter(join.relation.Derived.subquery, this).run(false);
                 let sub_query_alias = join.relation.Derived.alias.name.value;
                 joins.push(join_method + '(DB::raw("' + addTabToEveryLine(sub_query_sql) + '") as '
                     + sub_query_alias + '), function($join) {\n\t'
@@ -511,6 +512,8 @@ export class Converter
     getActualTableName(table_name_or_alias) {
         if (propertyExistsInObjectAndNotNull(this.table_name_by_alias, table_name_or_alias)) {
             return this.table_name_by_alias[table_name_or_alias];
+        } else if (this.parent != null) {
+            return this.parent.getActualTableName(table_name_or_alias);
         }
 
         return table_name_or_alias;
