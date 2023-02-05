@@ -53,6 +53,14 @@ export class Converter
             sections.push(this.resolveOrderBySection());
         }
 
+        if (propertyExistsInObjectAndNotNull(this.ast, 'limit')) {
+            sections.push('limit(' + this.ast.limit.Value.Number[0] + ')');
+        }
+
+        if (propertyExistsInObjectAndNotNull(this.ast, 'offset')) {
+            sections.push('offset(' + this.ast.offset.value.Value.Number[0] + ')');
+        }
+
         if (need_append_get_suffix) {
             sections.push('get();');
         }

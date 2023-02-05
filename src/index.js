@@ -35,7 +35,7 @@ let converter = function () {
 
     try {
         let ast = wasm.parse_sql("--mysql", input);
-
+console.log(ast);
         if (ast.startsWith('Error')) {
             output_text_area.value = ast;
         } else {
