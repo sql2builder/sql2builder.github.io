@@ -402,7 +402,7 @@ export class Converter
                     joins.push(join_method + '(' + joined_table + ','
                         + 'function($join) {\n\t'
                         + '$join->' + addTabToEveryLine(conditions.join('\n->')) + ';'
-                        + '\n}'
+                        + '\n})'
                     );
                 }
             } else {
