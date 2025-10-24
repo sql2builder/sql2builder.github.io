@@ -4,9 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Convert SQL to Laravel query builder. Laravel where nested. laravel where in subquery. laravel join subquery.">
-  <title>SQL to Laravel Builder</title>
+  <title>SQL to Laravel Builder - Modern Converter</title>
   <link href="https://cdn.bootcss.com/font-awesome/5.11.2/css/fontawesome.min.css" rel="stylesheet">
-  <link href="https://cdn.bootcss.com/bulma/0.7.5/css/bulma.min.css" rel="stylesheet">
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9087401435839175" crossorigin="anonymous"></script>
   <!-- Global site tag (gtag.js) - Google Analytics -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-Z93ZQ8Z1M6"></script>
@@ -21,56 +20,80 @@
 <body>
 
 <section class="hero is-primary is-small">
-
+  <a target="_blank" href="https://github.com/sql2builder/sql2builder.github.io" class="github-link">
+    View on GitHub
+  </a>
   <div class="hero-body">
     <div class="container has-text-centered">
       <h1 class="title">
-        Convert Your Legacy SQL to Laravel Query Builder
+        🚀 SQL to Laravel Query Builder
       </h1>
+      <p class="subtitle">
+        Transform your legacy SQL queries into elegant Laravel code instantly
+      </p>
     </div>
   </div>
 </section>
-<div style="margin-left: 20px;">
-  <a target="_blank" href="https://github.com/sql2builder/sql2builder.github.io">Github</a>
-</div>
 
-<div>
-  <div class="columns is-mobile is-centered">
-    <div class="column is-two-thirds">
-      <div class="content-area">
-        <div class="box box-offset">
+<div class="content-wrapper">
+  <!-- Converter Grid - Side by Side Layout -->
+  <div class="converter-grid">
+    <!-- Input Section -->
+    <div class="converter-card fade-in-up">
+      <div class="section-header">
+        <div class="section-icon">📝</div>
+        <span>Input SQL Query</span>
+      </div>
 
-          <div class="field">
-            <div class="control">
-              <textarea class="textarea" name="sql" rows="10" placeholder="Enter Your Sql" id="input"></textarea>
-            </div>
-          </div>
+      <div class="textarea-wrapper">
+        <textarea class="textarea" name="sql" placeholder="-- Enter your SQL query here
+-- Example:
+SELECT users.name, orders.total
+FROM users
+INNER JOIN orders ON users.id = orders.user_id
+WHERE users.active = 1
+ORDER BY orders.created_at DESC
+LIMIT 10" id="input"></textarea>
+      </div>
 
-          <div class="level-left">
-            <div class="level-item has-text-centered">
-              <button class="button is-primary" id="convert-button">
-                Convert
-              </button>
-            </div>
-            <div class="level-item has-text-centered">
-              <button class="button" id="share-button">
-                Share
-              </button>
-            </div>
-          </div>
-        </div>
+      <div class="button-controls">
+        <button class="button is-primary" id="convert-button">
+          <span>✨ Convert to Laravel</span>
+        </button>
+        <button class="button is-secondary" id="share-button">
+          <span>🔗 Share Query</span>
+        </button>
+      </div>
+    </div>
 
-        <div class="box box-offset">
-          <div class="field">
-            <div class="control">
-              <textarea class="textarea" name="sql" rows="10" placeholder="Output" id="output"></textarea>
-            </div>
-          </div>
-        </div>
+    <!-- Output Section -->
+    <div class="converter-card fade-in-up">
+      <div class="section-header">
+        <div class="section-icon">💎</div>
+        <span>Laravel Query Builder Output</span>
+      </div>
+
+      <div class="textarea-wrapper">
+        <button class="copy-button" id="copy-button" title="Copy to clipboard">
+          <span id="copy-icon">📋</span>
+          <span id="copy-text">Copy</span>
+        </button>
+        <textarea class="textarea code-output" name="sql" placeholder="// Your Laravel query builder code will appear here..." id="output" readonly></textarea>
       </div>
     </div>
   </div>
+
+  <!-- Additional Info -->
+  <div class="text-center text-muted mt-4">
+    <p>💡 Tip: Use the Share button to create a shareable link with your SQL query</p>
+  </div>
+
 </div>
+
+<footer class="modern-footer">
+  <p>Built with ❤️ for Laravel developers | <a href="https://github.com/sql2builder/sql2builder.github.io" target="_blank">Contribute on GitHub</a></p>
+</footer>
+
 <input style="display: none;" id="base64sql"></input>
 </body>
 </html>
