@@ -1,4 +1,4 @@
-const wasm = require('../node_modules/sqlparser-rs-wasm');
+const wasm = require('sqlparser-rs-wasm');
 const Converter = require('../src/converter');
 
 test('union all for users where null', () => {
