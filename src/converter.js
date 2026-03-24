@@ -48,16 +48,16 @@ export class Converter
             // left_sql currently may start with "DB::table('...')" or "->from('...')" when nested; ensure proper prefix
             let base = (new Converter(left.Query || left, this).run(false));
 
-            // Build union call: pass the right query builder expression as a DB::raw of the SQL from right_converter without trailing get();
-            // Prefer passing DB::table(...) closure to preserve query builder: use function($query) { $query->from(...)->... }
-            let right_closure = 'function ($query) {\n\t' + right_sql.replace('DB::table', '$query->from').split('\n').join('\n\t') + ';\n}';
+            // Build union call: pass the right query builder expression directly (as DB::table(...)->...)
+            let right_block = right_sql;
 
-            let union_section = base + '\n->' + union_method + '(' + right_closure + ')';
+            // Indent right block and wrap in parentheses as argument to union/unionAll
+            let union_section = base + '\n->' + union_method + '(\n' + addTabToEveryLine(right_block, 1) + '\n)';
 
             // If top-level has order_by / limit / offset, append them
             if (propertyExistsInObjectAndNotNull(this.ast, 'order_by') && this.ast.order_by.length > 0) {
                 union_section = union_section + '\n->' + (new Converter(this.ast, this).resolveOrderBySection());
-            } else if (propertyExistsInObjectAndNotNull(this.ast, 'order_by') && this.ast.order_by.length === 0 && propertyExistsInObjectAndNotNull(this.ast.body, 'order_by') && this.ast.body.order_by.length > 0) {
+            } else if (propertyExistsInObjectAndNotNull(this.ast.body, 'order_by') && this.ast.body.order_by.length > 0) {
                 union_section = union_section + '\n->' + (new Converter(this.ast.body, this).resolveOrderBySection());
             }
 
