@@ -9,6 +9,65 @@ export class Converter
     run(need_append_get_suffix = true) {
         let sections = []
 
+        // Handle UNION / UNION ALL set operations at top-level
+        if (propertyExistsInObjectAndNotNull(this.ast.body, 'SetOperation') || propertyExistsInObjectAndNotNull(this.ast.body, 'SetExpr')) {
+            // Support several possible AST shapes (SetOperation or SetExpr)
+            let set_node = this.ast.body.SetOperation || this.ast.body.SetExpr || this.ast.body;
+
+            // helper to extract left/right and op
+            let left = set_node.left || set_node.l || null;
+            let right = set_node.right || set_node.r || null;
+            let op = set_node.op || set_node.operator || set_node.SetOperator || null;
+
+            // if nested structure (e.g. { Unnamed: { SetOperation: { ... } } }) try deeper
+            if (!left && propertyExistsInObjectAndNotNull(set_node, 'Unnamed') && propertyExistsInObjectAndNotNull(set_node.Unnamed, 'SetOperation')) {
+                set_node = set_node.Unnamed.SetOperation;
+                left = set_node.left; right = set_node.right; op = set_node.op;
+            }
+
+            if (!left || !right) {
+                throw 'Logic error, unhandled set operation node structure';
+            }
+
+            // convert left and right subqueries to Converter outputs without get();
+            let left_sql = (new Converter(left.Query || left, this).run(false)).replace(/^DB::table/, '');
+            // create converter for right
+            let right_converter = new Converter(right.Query || right, this);
+            let right_sql = right_converter.run(false);
+
+            // choose union method
+            let union_method = 'union';
+            // detect union all keywords
+            if (op && (op.toString().toLowerCase().includes('all') || (op.type && op.type.toLowerCase && op.type.toLowerCase().includes('all')))) {
+                union_method = 'unionAll';
+            } else if (typeof op === 'string' && op.toLowerCase().includes('union all')) {
+                union_method = 'unionAll';
+            }
+
+            // assemble: start from left (which is expected to be a DB::table(...) prefix), then chain ->union( DB::table(...) ... )
+            // left_sql currently may start with "DB::table('...')" or "->from('...')" when nested; ensure proper prefix
+            let base = (new Converter(left.Query || left, this).run(false));
+
+            // Build union call: pass the right query builder expression as a DB::raw of the SQL from right_converter without trailing get();
+            // Prefer passing DB::table(...) closure to preserve query builder: use function($query) { $query->from(...)->... }
+            let right_closure = 'function ($query) {\n\t' + right_sql.replace('DB::table', '$query->from').split('\n').join('\n\t') + ';\n}';
+
+            let union_section = base + '\n->' + union_method + '(' + right_closure + ')';
+
+            // If top-level has order_by / limit / offset, append them
+            if (propertyExistsInObjectAndNotNull(this.ast, 'order_by') && this.ast.order_by.length > 0) {
+                union_section = union_section + '\n->' + (new Converter(this.ast, this).resolveOrderBySection());
+            } else if (propertyExistsInObjectAndNotNull(this.ast, 'order_by') && this.ast.order_by.length === 0 && propertyExistsInObjectAndNotNull(this.ast.body, 'order_by') && this.ast.body.order_by.length > 0) {
+                union_section = union_section + '\n->' + (new Converter(this.ast.body, this).resolveOrderBySection());
+            }
+
+            if (need_append_get_suffix) {
+                union_section = union_section + '\n->get();';
+            }
+
+            return union_section;
+        }
+
         let from_item = this.ast.body.Select.from[0];
 
         if (propertyExistsInObjectAndNotNull(from_item.relation, 'Table')) {
